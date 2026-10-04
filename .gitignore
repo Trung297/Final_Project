@@ -1,0 +1,24 @@
+# 1. Bỏ qua các file dữ liệu nặng (Data Files)
+*.csv
+*.parquet
+*.pkl
+*.7z
+raw_data/
+kkbox-dataset/
+temp_load_staging/
+
+# 2. Bỏ qua cache của Python và Jupyter Notebook
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 3. Bỏ qua môi trường ảo và file cấu hình bảo mật
+venv/
+env/
+.env
+
+# 4. Bỏ qua file cấu hình của hệ điều hành và IDE
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
