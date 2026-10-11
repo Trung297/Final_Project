@@ -1,10 +1,11 @@
 # 1. Bỏ qua các file dữ liệu nặng (Data Files)
 *.csv
 *.parquet
-*.pkl
+# *.pkl
 *.7z
 raw_data/
 kkbox-dataset/
+kkbox_dataset/
 temp_load_staging/
 
 # 2. Bỏ qua cache của Python và Jupyter Notebook
