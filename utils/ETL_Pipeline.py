@@ -122,14 +122,45 @@ def load_data_warehouse(df_user_logs, df_transactions, df_members):
         # BƯỚC 2: NẠP fact_subscription_transaction (~22.9 triệu dòng)
         # -------------------------------------------------------------
         print("2. Đang xuất CSV và nạp fact_subscription_transaction...")
-        df_transactions.to_csv(file_trans, index=False, na_rep='\\N')
+        transaction_cols = [
+            "msno",
+            "payment_method_id",
+            "payment_plan_days",
+            "plan_list_price",
+            "actual_amount_paid",
+            "is_auto_renew",
+            "transaction_date",
+            "membership_expire_date",
+            "is_cancel",
+            "dtime_data_created"
+        ]
+
+        df_transactions[transaction_cols].to_csv(
+            file_trans,
+            index=False,
+            na_rep="\\N",
+            lineterminator="\n"
+        )
+
         sql_trans = f"""
             LOAD DATA LOCAL INFILE '{file_trans}'
             INTO TABLE fact_subscription_transaction
-            FIELDS TERMINATED BY ',' 
+            FIELDS TERMINATED BY ','
             OPTIONALLY ENCLOSED BY '"'
-            LINES TERMINATED BY '\n'
-            IGNORE 1 LINES;
+            LINES TERMINATED BY '\\n'
+            IGNORE 1 LINES
+            (
+                msno,
+                payment_method_id,
+                payment_plan_days,
+                plan_list_price,
+                actual_amount_paid,
+                is_auto_renew,
+                transaction_date,
+                membership_expire_date,
+                is_cancel,
+                dtime_data_created
+            );
         """
         cursor.execute(sql_trans)
         connection.commit()
