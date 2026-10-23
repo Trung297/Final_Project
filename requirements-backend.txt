@@ -1,0 +1,13 @@
+# Pin these to the SAME versions used when model artifacts were exported,
+# especially Python, scikit-learn, XGBoost, SHAP and NumPy.
+fastapi
+uvicorn[standard]
+pandas
+numpy
+scikit-learn
+xgboost
+shap
+joblib
+sqlalchemy
+PyMySQL
+python-dotenv

@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Use the Windows host's MySQL instance from Docker Desktop.
+      DB_HOST: host.docker.internal
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    ports:
+      - "127.0.0.1:8501:8501"
+    environment:
+      # Server-side Streamlit requests call the backend service by name.
+      API_BASE_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

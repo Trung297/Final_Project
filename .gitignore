@@ -17,6 +17,10 @@ __pycache__/
 venv/
 env/
 .env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
 
 # 4. Bỏ qua file cấu hình của hệ điều hành và IDE
 .vscode/

@@ -1,0 +1,26 @@
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+# Native OpenMP runtime used by XGBoost on slim Linux images.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-backend.txt ./
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements-backend.txt
+
+# Copy only the runtime code and the trained model artifacts.
+COPY backend/ ./backend/
+COPY utils/ ./utils/
+# Only these four artifacts are needed for serving (avoid huge notebook datasets).
+COPY artifacts/xgboost_model.pkl artifacts/xgboost_info.pkl \
+     artifacts/inference_preprocessor.pkl artifacts/best_shap_explainer.pkl ./artifacts/
+
+EXPOSE 8000
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
