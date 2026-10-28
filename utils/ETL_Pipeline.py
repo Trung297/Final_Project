@@ -11,26 +11,11 @@ from utils.db import *
 from utils.cleaning import *
 from utils.stats import *
 
-# logging.basicConfig(
-#     level = logging.INFO,
-#     format = "%(asctime)s - %(levelname)s - %(message)s",
-#     datefmt = "%H:%M:%S",
-#     handlers = [
-#         logging.FileHandler(f"log/ETL_UserLogs_Pipeline_{datetime.now():%Y-%m-%d}.log", 
-#                             encoding="utf-8"),
-#         logging.StreamHandler()
-#     ]
-# )
-
-# log = logging.getLogger(__name__)
 
 def extract(file_paths, chunksize=2_000_000):
-    # log.info("EXTRACT start (Streaming Data Mode)")
     for file in file_paths:
-        # log.info(f"Extracting file: {file}")
         for i, chunk in enumerate(pd.read_csv(file, chunksize=chunksize)):
             yield file, i, chunk
-    # log.info("EXTRACT completely done")
 
 
 def transform(df_user_logs, df_transactions, df_members):
@@ -89,7 +74,6 @@ def load_data_warehouse(df_user_logs, df_transactions, df_members):
         autocommit=False
     )
     
-    # 2. Tạo thư mục tạm để chứa các tệp CSV chuyển đổi
     temp_dir = "temp_load_staging"
     os.makedirs(temp_dir, exist_ok=True)
     
@@ -118,9 +102,7 @@ def load_data_warehouse(df_user_logs, df_transactions, df_members):
         connection.commit()
         print(f" -> Đã nạp thành công dim_members ({len(df_members):,} dòng).")
 
-        # -------------------------------------------------------------
-        # BƯỚC 2: NẠP fact_subscription_transaction (~22.9 triệu dòng)
-        # -------------------------------------------------------------
+
         print("2. Đang xuất CSV và nạp fact_subscription_transaction...")
         transaction_cols = [
             "msno",
@@ -166,9 +148,7 @@ def load_data_warehouse(df_user_logs, df_transactions, df_members):
         connection.commit()
         print(f" -> Đã nạp thành công fact_subscription_transaction ({len(df_transactions):,} dòng).")
 
-        # -------------------------------------------------------------
-        # BƯỚC 3: NẠP fact_user_daily_activity (~20M - 38M dòng)
-        # -------------------------------------------------------------
+
         print("3. Đang xuất CSV và nạp fact_user_daily_activity...")
         df_user_logs.to_csv(file_logs, index=False, na_rep='\\N')
         sql_logs = f"""
@@ -189,14 +169,12 @@ def load_data_warehouse(df_user_logs, df_transactions, df_members):
         raise e
 
     finally:
-        # Bật lại toàn bộ các ràng buộc toàn vẹn của CSDL
         cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
         cursor.execute("SET UNIQUE_CHECKS = 1;")
         cursor.execute("SET SQL_LOG_BIN = 1;")
         cursor.close()
         connection.close()
 
-        # Dọn dẹp toàn bộ tệp tạm để giải phóng bộ nhớ đĩa
         for f in [file_members, file_trans, file_logs]:
             if os.path.exists(f):
                 os.remove(f)
@@ -241,7 +219,6 @@ def load_user_logs_final(df_user_logs):
     cursor = conn.cursor()
     
     try:
-        # Tạm tắt các chốt chặn kiểm tra để đạt tốc độ nạp khối tối đa
         cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
         cursor.execute("SET UNIQUE_CHECKS = 0;")
         cursor.execute("SET SQL_LOG_BIN = 0;")
@@ -269,7 +246,6 @@ def load_user_logs_final(df_user_logs):
         raise e
         
     finally:
-        # Bật lại các ràng buộc toàn vẹn
         cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
         cursor.execute("SET UNIQUE_CHECKS = 1;")
         cursor.execute("SET SQL_LOG_BIN = 1;")
@@ -283,14 +259,11 @@ def load_user_logs_final(df_user_logs):
 def process_only_user_logs(df_user_logs):
     print(f"--- 1. BẮT ĐẦU TRANSFORM fact_user_daily_activity ({len(df_user_logs):,} dòng) ---")
     
-    # 1.1. Parse ngày trực tiếp từ int32 mà không qua ép chuỗi (.astype(str)) để tiết kiệm RAM
     df_user_logs['date'] = pd.to_datetime(df_user_logs['date'].astype('int32'), format='%Y%m%d')
     
-    # 1.2. Loại bỏ bản ghi thiếu msno và trùng lặp khóa chính
     df_user_logs.dropna(subset=['msno'], inplace=True)
     df_user_logs.drop_duplicates(subset=['msno', 'date'], inplace=True)
     
-    # 1.3. Lọc ngoại lai bằng index (KHÔNG dùng Boolean Mask để tránh ArrowMemoryError)
     invalid_idx = df_user_logs.index[
         (df_user_logs['total_secs'] < 0) | (df_user_logs['total_secs'] > 86400)
     ]
@@ -298,7 +271,6 @@ def process_only_user_logs(df_user_logs):
         df_user_logs.drop(index=invalid_idx, inplace=True)
     del invalid_idx
     
-    # 1.4. Bổ sung dấu thời gian ETL
     df_user_logs['dtime_data_created'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     gc.collect()
     print(f" -> Transform hoàn tất: {len(df_user_logs):,} dòng sạch sẵn sàng nạp.")
