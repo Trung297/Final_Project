@@ -168,8 +168,6 @@ class ChurnRepository:
         ].fillna(0)
 
         if self.transaction_mode == "eda_legacy":
-            # IMPORTANT: this mirrors notebook cell 35 AFTER aggregation.
-            # For two source-swapped tx with flag=1, this creates ratio=2.
             paid = result["total_paid"].copy()
             result["total_paid"] = result["auto_renew_ratio"]
             result["auto_renew_ratio"] = paid
@@ -221,8 +219,6 @@ class ChurnRepository:
             raise ValueError("batch_size phải là số nguyên dương")
 
         params = self._window_params(observation_start, observation_end)
-        # With the existing index (msno, date), MySQL can scan msno order
-        # while checking the observation window, then stop at LIMIT.
         page_sql_base = """
             SELECT DISTINCT ul.msno
             FROM fact_user_daily_activity AS ul
@@ -237,8 +233,6 @@ class ChurnRepository:
         batch_number = 0
         with self.engine.connect() as conn:
             while True:
-                # Keep the keyset predicate sargable. Do not use OFFSET
-                # (later pages would become slower as OFFSET grows).
                 after_filter = "AND ul.msno > :after_msno" if after_msno is not None else ""
                 page_sql = text(
                     page_sql_base
