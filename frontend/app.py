@@ -1,18 +1,3 @@
-"""KKBOX Churn Intelligence — Streamlit dashboard for the existing FastAPI.
-
-Design inspired by Streamlit Gallery's Stock Peer Analysis Dashboard:
-https://github.com/streamlit/demo-stockpeers (layout/theme inspiration only).
-
-From the Final_Project repository root:
-    python -m uvicorn backend.main:app --reload
-    python -m streamlit run dashboard/app.py
-
-Dependencies: streamlit, pandas, plotly, requests.
-Optional: API_BASE_URL (default http://127.0.0.1:8000).
-
-The app only uses FastAPI; it never connects directly to MySQL or loads model files.
-"""
-
 from __future__ import annotations
 
 import html
