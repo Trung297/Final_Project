@@ -1,192 +1,126 @@
+
 # KKBOX Churn Prediction System
 
-Hệ thống dự đoán nguy cơ người dùng ngừng hoạt động trên nền tảng nghe nhạc KKBOX bằng Machine Learning, kết hợp MySQL Data Warehouse, XGBoost, SHAP, FastAPI và Streamlit.
+Hệ thống dự đoán người dùng rời bỏ dịch vụ nghe nhạc KKBOX bằng Machine Learning, kết hợp MySQL, XGBoost, SHAP, FastAPI, Streamlit và Docker.
 
-> **Định nghĩa Churn trong nghiên cứu:** người dùng không có hoạt động nghe nhạc được ghi nhận trong tháng dự đoán; không nhất thiết là hủy thuê bao.
+> **Định nghĩa trong đề tài:** `Churn = 1` khi người dùng **không phát sinh hoạt động nghe nhạc trong Prediction Window** (tháng tiếp theo). Đây là *behavioral churn*, **không đồng nghĩa** với việc người dùng hủy gói thuê bao.
+> **Phạm vi triển khai:** Docker Compose hiện chỉ chạy **Backend FastAPI và Frontend Streamlit**. **MySQL được cài và chạy trên máy Windows**, không phải một service Docker trong repository này.
 
-## 1. Thành phần hệ thống
+## 1. Thứ tự chạy các Notebook
 
-- **Data Pipeline:** xử lý dữ liệu KKBOX và nạp vào MySQL Data Warehouse.
-- **Machine Learning:** so sánh Logistic Regression, Decision Tree, Random Forest và XGBoost; sử dụng XGBoost cho inference.
-- **SHAP:** giải thích các đặc trưng đóng góp vào kết quả dự đoán.
-- **FastAPI Backend:** dự đoán theo dữ liệu đầu vào hoặc mã người dùng, truy vấn kết quả batch, cung cấp giải thích SHAP.
-- **Streamlit Frontend:** ba trang **Overview**, **Users** và **User Analysis**.
-- **Docker Compose:** chạy **2 container Backend + Frontend**; MySQL chạy trực tiếp trên Windows, không nằm trong Docker Compose.
+Trước khi chạy thì giải nén file rar trong thư mục kkbox_dataset
 
-## 2. Yêu cầu trước khi chạy
+**Bước 1: `Notebook/EDA.ipynb`**
 
-- Git, Docker Desktop (Linux containers / WSL 2 trên Windows).
-- MySQL trên Windows, mặc định cổng `3306`.
-- Database `kkbox_dwh` đã được tạo và **nạp dữ liệu**, với các bảng `dim_members`, `dim_date`, `fact_user_daily_activity`, `fact_subscription_transaction`, `churn_predictions`.
-- Các model artifact trong `artifacts/`: `xgboost_model.pkl`, `xgboost_info.pkl`, `inference_preprocessor.pkl`, `best_shap_explainer.pkl`.
+- Đọc, làm sạch dữ liệu KKBOX và thực hiện ETL vào MySQL Data Warehouse.
+- Phân tích dữ liệu, xây dựng hai snapshot và gán nhãn Churn.
+- **File đầu ra:** `artifacts/master_eda.pkl`.
 
-**Lưu ý:** Repository không cung cấp bản sao MySQL đã nạp dữ liệu. Docker Compose không tự khởi tạo các bảng Data Warehouse. Bảng `churn_predictions` **phải tồn tại trước khi Backend khởi động**, ngay cả khi chưa có bản ghi dự đoán. Có thể tham khảo notebook tại `Notebook/` và mã ETL tại `utils/` để xây dựng dữ liệu.
+*Lưu ý: Cần tạo các bảng MySQL trước. Nếu database đã có dữ liệu, bỏ qua các ô ETL nạp dữ liệu để tránh trùng lặp.*
 
-Nguồn dữ liệu: [WSDM – KKBox's Churn Prediction Challenge (Kaggle)](https://www.kaggle.com/competitions/kkbox-churn-prediction-challenge).
+**Bước 2: `Notebook/Preprocessing.ipynb`**
 
-## 3. Chạy bằng Docker (khuyến nghị)
+- Đọc `master_eda.pkl`.
+- Feature Engineering, chia Train/Validation/Test, chuẩn hóa và áp dụng SMOTE.
+- **File đầu ra:**
+  - `artifacts/processed_data.pkl`
+  - `artifacts/inference_preprocessor.pkl`
 
-Các lệnh sau thực hiện trong **PowerShell** trên Windows.
+**Bước 3: `Notebook/model.ipynb`**
 
-### Bước 1 — Clone repository
+- Đọc `processed_data.pkl`.
+- Huấn luyện và đánh giá Logistic Regression, Decision Tree, Random Forest và XGBoost.
+- **File đầu ra:** Các file model và thông tin mô hình trong `artifacts/`:
+  - `logistic_model.pkl`, `logistic_info.pkl`
+  - `decision_tree_model.pkl`, `decision_tree_info.pkl`
+  - `random_forest_model.pkl`, `random_forest_info.pkl`
+  - `xgboost_model.pkl`, `xgboost_info.pkl`
 
-```powershell
-git clone https://github.com/Trung297/Final_Project.git
-cd Final_Project
-```
+**Bước 4: `Notebook/SHAP.ipynb`**
 
-### Bước 2 — Cấu hình MySQL
+- Đọc `processed_data.pkl` và các mô hình đã huấn luyện.
+- Phân tích SHAP và lưu bộ giải thích của XGBoost.
+- **File đầu ra:** `artifacts/best_shap_explainer.pkl`.
 
-```powershell
-Copy-Item .env.example .env
-```
+**Bước 5: Batch Prediction**
 
-Mở `.env` và điền thông tin thực tế:
+Chạy từ thư mục gốc project:
 
-```dotenv
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=kkbox_app
-DB_PASSWORD=YOUR_MYSQL_PASSWORD
-DB_NAME=kkbox_dwh
-PYTHON_VERSION=3.12
-```
+`python -m backend.batch_prediction`
 
-- Đổi `DB_USER`, `DB_PASSWORD` theo tài khoản MySQL được cấp quyền.
-- `DB_HOST=localhost` dùng cho Python chạy trực tiếp trên Windows. Docker Compose tự ghi đè `DB_HOST=host.docker.internal` bên trong Backend container.
-- **Không commit `.env`** hoặc chia sẻ mật khẩu thật.
+- Dự đoán Churn cho người dùng trong tháng quan sát.
+- **Đầu ra:** Kết quả được lưu vào bảng `churn_predictions` trong MySQL.
 
-Nếu cần tạo tài khoản ứng dụng, chạy bằng quyền quản trị MySQL sau khi đã tạo database và các bảng:
+*Bảng `churn_predictions` cần được tạo trước khi chạy.*
 
-```sql
-CREATE USER 'kkbox_app'@'%' IDENTIFIED BY 'CHANGE_TO_A_STRONG_PASSWORD';
-GRANT SELECT ON kkbox_dwh.* TO 'kkbox_app'@'%';
--- Chỉ cần các quyền sau nếu muốn thực thi batch prediction:
-GRANT INSERT, UPDATE ON kkbox_dwh.churn_predictions TO 'kkbox_app'@'%';
-```
+## 2. Chạy hệ thống bằng Docker
 
-Tài khoản và phạm vi host cho phép truy cập nên được giới hạn theo môi trường thực tế. Không mở cổng MySQL ra Internet.
+**Bước 1: Chuẩn bị môi trường**
 
-### Bước 3 — Khởi động dịch vụ
+- Cài đặt Docker Desktop và MySQL.
+- Đảm bảo database `kkbox_dwh` đã có dữ liệu và bảng `churn_predictions`.
+- Tạo file `.env` từ `.env.example`, sau đó cấu hình tài khoản và mật khẩu MySQL.
+- Đảm bảo thư mục `artifacts/` có đủ các file model, preprocessor và SHAP.
 
-Đảm bảo Docker Desktop và MySQL trên Windows đều đang chạy:
+**Bước 2: Khởi động Docker**
 
-```powershell
-docker compose up --build -d
-docker compose ps
-```
+Mở Terminal tại thư mục gốc project và chạy:
 
-| Dịch vụ | Đường dẫn |
-| --- | --- |
-| Streamlit Dashboard | http://localhost:8501 |
-| FastAPI | http://localhost:8000 |
-| Swagger API Docs | http://localhost:8000/docs |
+`docker compose up --build -d`
 
-### Bước 4 — Kiểm tra API và giao diện
+**Bước 3: Truy cập hệ thống**
 
-```powershell
-Invoke-RestMethod http://localhost:8000/health
-Invoke-RestMethod http://localhost:8000/predictions/summary
-```
+- **Frontend (Streamlit):** http://localhost:8501
+- **Backend (FastAPI):** http://localhost:8000
+- **Swagger API:** http://localhost:8000/docs
 
-Mở http://localhost:8501 để thử **Overview**, **Users** và **User Analysis**. Chọn một `msno` có hoạt động trong tháng 02/2017 để xem dự đoán tháng 03/2017 và SHAP.
+**Bước 4: Dừng hệ thống**
 
-**Chú ý:** Trong Docker, Frontend gọi Backend qua `http://backend:8000` (tên service nội bộ). Không đặt địa chỉ này thành `http://localhost:8000` trong container.
+`docker compose down`
 
-## 4. Dự đoán hàng loạt (nếu chưa có kết quả)
+## 3. Lưu ý
 
-Dashboard đọc dữ liệu dự đoán đã lưu trong bảng `churn_predictions`. Nếu bảng đã tồn tại nhưng chưa có dữ liệu cho model hiện tại, chạy:
+- Docker Compose chỉ chạy **hai container: Backend và Frontend**. MySQL chạy trên máy Windows.
+- Nếu đã có các file model trong `artifacts/` và dữ liệu MySQL đầy đủ, **không cần chạy lại toàn bộ notebook**.
+- Hệ thống hiện được triển khai trên môi trường local, chưa public lên Internet.
 
-Thử một batch 500 người dùng:
-
-```powershell
-docker compose exec backend python -m backend.batch_prediction --start 2017-02-01 --end 2017-02-28 --batch-size 500 --limit-batches 1
-```
-
-Chạy đầy đủ:
-
-```powershell
-docker compose exec backend python -m backend.batch_prediction --start 2017-02-01 --end 2017-02-28 --batch-size 500
-```
-
-Quá trình yêu cầu đủ bảng DWH và quyền `SELECT`, `INSERT`, `UPDATE`. Sau khi hoàn tất, tải lại Dashboard.
-
-## 5. Các lệnh Docker hữu ích
-
-```powershell
-# Xem trạng thái
-docker compose ps
-
-# Xem log
-docker compose logs -f backend
-docker compose logs -f frontend
-
-# Build lại sau khi sửa code
-docker compose up --build -d
-
-# Dừng hệ thống
-docker compose down
-```
-
-## 6. Chạy trực tiếp không qua Docker (tùy chọn)
-
-Sử dụng Python tương thích với model artifact (Docker mặc định Python 3.12), và đã chuẩn bị MySQL + `.env` như hướng dẫn ở trên.
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-backend.txt
-python -m pip install -r requirements-frontend.txt
-```
-
-Terminal 1 — Backend:
-
-```powershell
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
-```
-
-Terminal 2 — Frontend:
-
-```powershell
-$env:API_BASE_URL = "http://127.0.0.1:8000"
-python -m streamlit run frontend/app.py
-```
-
-**Lưu ý tương thích:** `requirements-backend.txt` hiện chưa khóa toàn bộ phiên bản. Các artifact pickle/joblib cần phiên bản Python và thư viện ML tương thích với môi trường lúc xuất model.
-
-## 7. Lỗi thường gặp
-
-| Lỗi | Giải pháp |
-| --- | --- |
-| Backend không khởi động | Kiểm tra MySQL, file `.env`, bảng `churn_predictions`; xem `docker compose logs backend`. |
-| `Access denied` hoặc không kết nối được MySQL | Kiểm tra username/password, grants, firewall, `host.docker.internal`. |
-| Dashboard không có dữ liệu | Chạy batch prediction cho tháng 02/2017, kiểm tra bản ghi trong `churn_predictions` tương ứng model hiện tại. |
-| Lỗi XGBoost/SHAP/joblib | Kiểm tra các file trong `artifacts/` và phiên bản thư viện khi train model. |
-| Port 8000/8501 đã sử dụng | Dừng Uvicorn/Streamlit local hoặc chỉnh port mapping trong `docker-compose.yml`. |
-| Frontend không gọi được Backend | Kiểm tra service `backend` healthy và `API_BASE_URL=http://backend:8000`. |
-
-## 8. Cấu trúc thư mục
+## 4. Cấu trúc thư mục
 
 ```text
 Final_Project/
-├── Notebook/                  # EDA, Preprocessing, Model Training, SHAP
-├── utils/                     # ETL, kết nối dữ liệu, inference
-├── backend/                   # FastAPI, batch prediction, API truy vấn, SHAP
-├── frontend/app.py            # Streamlit Dashboard
-├── artifacts/                 # Model và preprocessing artifacts
-├── docker-compose.yml
+├── Notebook/
+│   ├── EDA.ipynb                    # ETL, EDA, tạo master_eda.pkl
+│   ├── Preprocessing.ipynb          # Feature Engineering, Split, Scale, SMOTE
+│   ├── model.ipynb                  # Train/đánh giá/lưu 4 thuật toán
+│   ├── SHAP.ipynb                   # SHAP, lưu best_shap_explainer.pkl
+│   └── kkbox-dataset/              # CSV tải ngoài, không commit
+├── utils/
+│   ├── ETL_Pipeline.py              # Hàm extract/transform/load MySQL
+│   ├── cleaning.py
+│   ├── base_model.py                # Hàm huấn luyện và đánh giá
+│   ├── inference.py                 # Chạy model đã huấn luyện
+│   ├── config.py                    # Đọc DB_* từ biến môi trường
+│   └── db.py
+├── artifacts/                       # Pickle model, preprocessor, SHAP, dữ liệu xử lý
+├── backend/
+│   ├── main.py                      # FastAPI
+│   ├── batch_prediction.py          # Sinh và lưu churn_predictions
+│   ├── repository.py
+│   ├── predictions_api.py
+│   └── shap_api.py
+├── frontend/
+│   └── app.py                       # Streamlit Dashboard
 ├── Dockerfile.backend
 ├── Dockerfile.frontend
+├── docker-compose.yml
 ├── requirements-backend.txt
 ├── requirements-frontend.txt
 ├── .env.example
 └── README.md
 ```
 
-## 9. Bảo mật và phạm vi triển khai
+---
 
-Đây là hệ thống **chạy local**, chưa triển khai public. Các cổng 8000 và 8501 hiện được Docker Compose giới hạn trên `127.0.0.1`. Nếu triển khai Internet trong tương lai, cần bổ sung xác thực, phân quyền, HTTPS, quản lý secret và cơ sở dữ liệu phù hợp.
+**Lưu ý bảo mật mã nguồn:** Một số hàm ETL trong `utils/ETL_Pipeline.py` hiện có giá trị mật khẩu *fallback* viết trực tiếp trong source. Trước khi chia sẻ hoặc triển khai, nên bỏ các giá trị mặc định nhạy cảm này, chỉ lấy mật khẩu từ `.env`; nếu từng công bố mật khẩu sử dụng thực tế, hãy đổi mật khẩu và rà soát lịch sử commit. Không đưa mật khẩu vào README hoặc GitHub.
 
-Chỉ tải các file model `.pkl` từ nguồn đáng tin cậy.
-
-Tài liệu Docker chi tiết đã có sẵn trong [README-DOCKER.md](README-DOCKER.md).
+**Ghi chú về tái lập thực nghiệm:** README phản ánh các file và lệnh **đang có trong repository**. Phần cấu hình schema MySQL và quy trình nạp DWH từ database rỗng chưa được đóng gói thành một script tự động hoàn chỉnh; phải chuẩn bị schema và kiểm tra các ô ETL trong `EDA.ipynb` trước khi chạy lại toàn bộ. Khi chỉ cần chạy hệ thống đã huấn luyện, có thể dùng các model artifact có sẵn và bỏ qua các bước train, nhưng **vẫn cần database MySQL tương thích**.
