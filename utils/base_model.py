@@ -88,22 +88,6 @@ def train_model(X_train, y_train, model_type="logistic", **kwargs):
         params.update(kwargs)
         model = XGBClassifier(**params)
 
-    # elif model_type in ["adaboost", "ada"]:
-    #     base_max_depth = kwargs.pop("base_max_depth", 2)
-    #     base_est = DecisionTreeClassifier(
-    #         max_depth=base_max_depth,
-    #         class_weight="balanced",
-    #         random_state=42
-    #     )
-    #     params = {
-    #         "estimator": base_est,
-    #         "n_estimators": 150,
-    #         "learning_rate": 0.1,
-    #         "random_state": 42
-    #     }
-    #     params.update(kwargs)
-    #     model = AdaBoostClassifier(**params)
-
     else:
         raise ValueError(f"Không hỗ trợ model_type='{model_type}'. Hãy chọn: 'logistic', 'decision_tree', 'random_forest' hoặc 'xgboost'")
 
