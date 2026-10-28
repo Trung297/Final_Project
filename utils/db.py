@@ -3,7 +3,6 @@ import pandas as pd
 
 
 def make_engine(cfg: dict):
-    # URL.create safely handles characters such as @, / or : in a DB password.
     url = URL.create(
         "mysql+pymysql",
         username=cfg["user"],
