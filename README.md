@@ -93,7 +93,7 @@ Final_Project/
 │   ├── Preprocessing.ipynb          # Feature Engineering, Split, Scale, SMOTE
 │   ├── model.ipynb                  # Train/đánh giá/lưu 4 thuật toán
 │   ├── SHAP.ipynb                   # SHAP, lưu best_shap_explainer.pkl
-│   └── kkbox-dataset/              # CSV tải ngoài, không commit
+│   └── kkbox-dataset/              # Chứa file rar, giải nén trước khi chạy các notebook
 ├── utils/
 │   ├── ETL_Pipeline.py              # Hàm extract/transform/load MySQL
 │   ├── cleaning.py
