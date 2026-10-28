@@ -1,22 +1,3 @@
-"""Read-only FastAPI endpoints for results saved by backend.batch_prediction.
-
-Integration in backend/main.py, after app and engine have been created:
-
-    from pathlib import Path
-    from backend.batch_prediction import calculate_model_version
-    from backend.predictions_api import create_predictions_router
-
-    version = calculate_model_version(Path(__file__).resolve().parents[1] / "artifacts")
-    app.include_router(create_predictions_router(engine, active_model_version=version))
-
-Endpoints:
-    GET /predictions           - paginated, sortable, filterable results
-    GET /predictions/summary   - aggregate KPIs for the same observation window
-    GET /predictions/user      - one saved prediction, using msno query param
-
-All SQL queries are SELECT-only, with an explicit observation window and model
-version, so distinct batch runs/models are never mixed unintentionally.
-"""
 from __future__ import annotations
 
 from calendar import monthrange
