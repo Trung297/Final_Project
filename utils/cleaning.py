@@ -88,15 +88,6 @@ def add_datetime_features(df: pd.DataFrame,
     out["quarter"] = out[date_col].dt.quarter
     return out
 
-# def add_shipping_features(df: pd.DataFrame) -> pd.DataFrame:
-#     out = df.copy()
-#     out["isShipped"]    = out["shippedDate"].notna().astype(int)
-#     out["deliveryDays"] = ((out["shippedDate"] - out["orderDate"])
-#                            .dt.days
-#                            .fillna(-1)
-#                            .astype(int))
-#     return out
-
 
 def add_features_chunked(df: pd.DataFrame,
                           chunksize: int = 1000) -> pd.DataFrame:
